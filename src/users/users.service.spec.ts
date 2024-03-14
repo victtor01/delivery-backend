@@ -48,17 +48,27 @@ describe('UsersService', () => {
   describe('create', () => {
     it('should create user', async () => {
       jest.spyOn(repository, 'findByEmail').mockResolvedValue(null);
-      jest.spyOn(repository, 'store').mockResolvedValue(new User(notExistsUser));
+
+      jest.spyOn(repository, 'store').mockImplementation(async (user) => {
+        const userWithHashedPassword = {
+          ...user,
+          password: await service.hashUserPassword(user.password),
+        };
+        return new User(userWithHashedPassword);
+      });
 
       const res = await service.create(notExistsUser);
 
       expect(res).toBeInstanceOf(User);
       expect(res.status).toEqual('CREATED');
+      expect(res.password).not.toEqual(notExistsUser.password);
       expect(repository.store).toHaveBeenCalledTimes(1);
     });
 
     it('should throw error if user already exists', async () => {
-      jest.spyOn(repository, 'findByEmail').mockResolvedValue(new User(exampleUser));
+      jest
+        .spyOn(repository, 'findByEmail')
+        .mockResolvedValue(new User(exampleUser));
 
       await expect(service.create(exampleUser)).rejects.toThrow(
         new BadRequestException('usuário já existente'),

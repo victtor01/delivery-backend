@@ -5,7 +5,7 @@ import * as bcrypt from 'bcrypt';
 
 export class User {
   @IsString()
-  public readonly id: string = randomUUID();
+  public readonly id: string;
   @IsString()
   public firstName: string;
   @IsString()
@@ -22,10 +22,10 @@ export class User {
 
   status: UserStatus = 'CREATED';
 
-  constructor(data: CreateUserDto) {
+  constructor(data: CreateUserDto, id?: string) {
     Object.assign(this, data);
+    this.id = id || randomUUID();
   }
-
 }
 
-export type UserStatus = 'CREATED' | 'VERIFIED' | 'DISABLED' | 'ACTIVATED';
+export type UserStatus = 'CREATED' | 'DISABLED' | 'ACTIVATED';

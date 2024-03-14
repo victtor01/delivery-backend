@@ -16,3 +16,8 @@ uma loja (delivery) para vender os produtos. Nosso foco é criar um sistema para
 
 - `USERS` tem vários `STORES` | Relação de 1 para N;
 - `STORES` tem vários `PRODUCTS` | Relação de 1 para N;
+
+### Como funciona CLIENT e MANAGER
+
+Por padrão, o usuário se cadastra e será um cliente, porém ele terá a opção de se tornar um MANAGER e tera algum botão para isso,
+ou seja, ele poderá paragar para criar a própria loja.

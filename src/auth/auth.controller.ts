@@ -1,14 +1,9 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { AuthService } from './auth.service';
 import { Public } from '../constants';
 import { AuthSendEmailToConfirmAccountDto } from './dto/auth-send-email-to-confirm-account.dto';
+import { AuthLoginInterfaceReturn } from './interfaces/auth-login-return';
 
 @Controller('auth')
 export class AuthController {
@@ -16,7 +11,7 @@ export class AuthController {
 
   @Public()
   @Post()
-  async login(@Body() data: AuthLoginDto) {
+  async login(@Body() data: AuthLoginDto): Promise<AuthLoginInterfaceReturn> {
     return await this.authService.login(data);
   }
 
@@ -28,8 +23,7 @@ export class AuthController {
 
   @Public()
   @Post('send-email')
-  async SendEmail (@Body() body: AuthSendEmailToConfirmAccountDto) {
+  async SendEmail(@Body() body: AuthSendEmailToConfirmAccountDto) {
     return await this.authService.sendEmailToConfirmAccount(body);
   }
-
 }

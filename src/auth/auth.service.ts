@@ -1,11 +1,17 @@
 import { UsersService } from '../users/users.service';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { EmailService } from '../email/email.service';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthSendEmailToConfirmAccountDto } from './dto/auth-send-email-to-confirm-account.dto';
 import { CLIENT_URL } from '../constants';
 import { User } from 'src/users/entities/user.entity';
+import { AuthLoginInterfaceReturn } from './interfaces/auth-login-return';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -15,15 +21,56 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
-  async login(data: AuthLoginDto) {
+  // private
+  private async authDtoLoginUser(user: User) {
+    // if user not exists
+    if (!user?.id) {
+      throw new BadRequestException('usuário não encontrado!');
+    }
+    // if status of user not is CREATED
+    if (user.status !== 'ACTIVATED') {
+      throw new BadRequestException(
+        'usuário não tem permissão para fazer o login!',
+      );
+    }
+  }
+
+  // public
+
+  async login(data: AuthLoginDto): Promise<AuthLoginInterfaceReturn> {
     const { email, password } = data;
 
     // get user
     const user = await this.usersService.findByEmail(email);
 
+    // verify user
+    if (!user) {
+      throw new BadRequestException('usuário não encontrado');
+    }
+
     // auth data of user
     await this.authDtoLoginUser(user);
-    
+
+    // compare passwords
+    const compare: boolean = await bcrypt.compare(password, user.password);
+    if (!compare) {
+      throw new UnauthorizedException('senha incorreta');
+    }
+
+    const { id } = user;
+    const dataJwt = { id, email };
+    const access_token = await this.jwtService.signAsync(dataJwt, {
+      expiresIn: '1m',
+    });
+
+    const refresh_token = await this.jwtService.signAsync(dataJwt, {
+      expiresIn: '1h',
+    });
+
+    return {
+      access_token,
+      refresh_token,
+    };
   }
 
   // send email to user
@@ -87,7 +134,8 @@ export class AuthService {
     // verify user
     await this.authDtoConfirmEmail(user);
 
-    await this.usersService.update(id, { status: 'VERIFIED' });
+    // update to activated
+    await this.usersService.update(id, { status: 'ACTIVATED' });
 
     return {
       error: false,
@@ -105,17 +153,6 @@ export class AuthService {
     // if status of user not is CREATED
     if (user.status !== 'CREATED') {
       throw new BadRequestException('usuário não pode ser verificado!');
-    }
-  }
-
-  private async authDtoLoginUser(user: User) {
-     // if user not exists
-     if (!user?.id) {
-      throw new BadRequestException('usuário não encontrado!');
-    }
-    // if status of user not is CREATED
-    if (user.status !== 'ACTIVATED') {
-      throw new BadRequestException('usuário não tem permissão para fazer o login!');
     }
   }
 }

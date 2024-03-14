@@ -10,13 +10,19 @@ export class UsersService {
   constructor(private readonly userRepo: UsersRepository) {}
 
   private saltHashPassoword = 10;
-  private async hashUserPassword(pass: string): Promise<string> {
+  
+  async hashUserPassword(pass: string): Promise<string> {
     return await bcrypt.hash(pass, this.saltHashPassoword);
+  }
+
+  async createManager () {
+
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     const userExists = await this.userRepo.findByEmail(createUserDto.email);
 
+    // verfify user
     if (userExists?.email) {
       throw new BadRequestException('usuário já existente');
     }
@@ -24,8 +30,14 @@ export class UsersService {
     // create user entity
     const user = new User(createUserDto);
 
-    user.password = await this.hashUserPassword(user.password);
-    return await this.userRepo.store(user);
+    try {
+      // create hash of password
+      user.password = await this.hashUserPassword(user.password);
+      // create user
+      return await this.userRepo.store(user);
+    } catch (error) {
+      throw new BadRequestException('houve um erro ao tentar criar usuário');
+    }
   }
 
   findByEmail(email: string) {

@@ -7,10 +7,12 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from '../users/entities/user.entity';
 import { BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 // Mocks
 jest.mock('../users/users.service');
 jest.mock('../email/email.service');
+jest.mock('bcrypt');
 jest.mock('@nestjs/jwt');
 
 describe('AuthService', () => {
@@ -65,25 +67,23 @@ describe('AuthService', () => {
     });
 
     it('should throw BadRequestException for invalid user', async () => {
+      jest.spyOn(usersService, 'findByEmail').mockResolvedValueOnce(null);
       const dto: AuthSendEmailToConfirmAccountDto = {
         email: 'nonexistent@example.com',
       };
-
-      jest.spyOn(usersService, 'findByEmail').mockResolvedValueOnce(null);
-
       expect(authService.sendEmailToConfirmAccount(dto)).rejects.toThrow(
         new BadRequestException('Usuário não encontrado!'),
       );
     });
 
     it('should throw BadRequestException for user with status different from created', async () => {
-      userMock.status = 'ACTIVATED';
-
       const dto: AuthSendEmailToConfirmAccountDto = {
         email: 'example@example.com',
       };
 
-      jest.spyOn(usersService, 'findByEmail').mockResolvedValueOnce(userMock);
+      jest
+        .spyOn(usersService, 'findByEmail')
+        .mockResolvedValueOnce({ ...userMock, status: 'ACTIVATED' });
 
       expect(authService.sendEmailToConfirmAccount(dto)).rejects.toThrow(
         new BadRequestException('Usuário não pode ser verificado!'),
@@ -116,7 +116,7 @@ describe('AuthService', () => {
         email: 'example@example.com',
       };
 
-      const userMockUpdated = new User({ ...userMock, status: 'VERIFIED' });
+      const userMockUpdated = new User({ ...userMock, status: 'ACTIVATED' });
 
       jest.spyOn(jwtService, 'verifyAsync').mockResolvedValue(decodedMock);
       jest.spyOn(usersService, 'findByEmail').mockResolvedValueOnce(userMock);
@@ -155,6 +155,32 @@ describe('AuthService', () => {
       expect(authService.confirmEmail('valid_token')).rejects.toThrow(
         new BadRequestException('usuário não pode ser verificado!'),
       );
+    });
+  });
+
+  describe('login', () => {
+    it('should sucesss login', async () => {
+      const dto = {
+        email: 'userExists@example.com',
+        password: 'correctPassword',
+      };
+
+      jest
+        .spyOn(usersService, 'findByEmail')
+        .mockResolvedValueOnce({ ...userMock, status: 'ACTIVATED' });
+      jest
+        .spyOn(jwtService, 'signAsync')
+        .mockResolvedValueOnce('refresh_token');
+      jest.spyOn(jwtService, 'signAsync').mockResolvedValueOnce('access_token');
+      jest.spyOn(bcrypt, 'compare').mockImplementation(async () => {
+        return true;
+      });
+
+      const res = await authService.login(dto);
+
+      expect(res).toBeDefined();
+      expect(res.access_token).toEqual('access_token');
+      expect(res.refresh_token).toEqual('refresh_token');
     });
   });
 });
