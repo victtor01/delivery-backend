@@ -8,7 +8,6 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { IS_PUBLIC_KEY } from '../constants';
-import { SECRET_KEY } from '../config';
 import { Request } from 'express';
 
 @Injectable()
@@ -18,34 +17,30 @@ export class AuthGuard implements CanActivate {
     private jwtService: JwtService,
   ) {}
 
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
-  }
-
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // verify if public route
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    if (isPublic) {
-      return true;
-    }
+    if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest();
-    const token = this.extractTokenFromHeader(request);
+    const cookies = request?.cookies;
 
-    if (!token) {
+    if (!cookies?.access_token || !cookies?.refresh_token) {
       throw new UnauthorizedException();
     }
 
+    const { access_token } = cookies;
+
     try {
-      const payload = await this.jwtService.verifyAsync(token);
+      const payload = await this.jwtService.verifyAsync(access_token);
       request.user = payload;
     } catch (err) {
       throw new UnauthorizedException({
-        message: 'houve um erro ao tentar autenticar',
+        message: 'houve um erro ao tentar autenticar usuário',
       });
     }
 

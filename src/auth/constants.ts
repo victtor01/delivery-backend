@@ -1,6 +1,6 @@
 const jwtConstants = {
   tokenExpiration: '10m',
-  refreshTokenExpiration: '50m',
+  refreshTokenExpiration: '1h',
 };
 
 export { jwtConstants };

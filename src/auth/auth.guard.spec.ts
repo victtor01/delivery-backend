@@ -43,7 +43,7 @@ describe('AuthGuard', () => {
     const contextMock: ExecutionContext = {
       switchToHttp: () => ({
         getRequest: () => ({
-          headers: { authorization: 'Bearer public_token' },
+          cookies: { access_token: 'access_token' },
         }),
       }),
       getHandler: () => null,
@@ -78,16 +78,13 @@ describe('AuthGuard', () => {
     const contextMock: ExecutionContext = {
       switchToHttp: () => ({
         getRequest: () => ({
-          headers: { authorization: 'Bearer invalid_token' },
+          cookies: { access_token: 'access_token' },
         }),
       }),
       getHandler: () => null,
       getClass: () => null,
     } as any;
 
-    jest
-      .spyOn(guard as any, 'extractTokenFromHeader')
-      .mockReturnValue('invalid_token');
     jest
       .spyOn(guard['jwtService'], 'verifyAsync')
       .mockRejectedValueOnce(new Error());
@@ -99,7 +96,7 @@ describe('AuthGuard', () => {
 
   it('should set user in request for valid token', async () => {
     const requestMock = {
-      headers: { authorization: 'Bearer valid_token' },
+      cookies: { access_token: 'valid_token', refresh_token: 'valid_refresh' },
       user: null,
     };
 

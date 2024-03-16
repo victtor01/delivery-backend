@@ -12,6 +12,10 @@ import { CLIENT_URL } from '../constants';
 import { User } from 'src/users/entities/user.entity';
 import { AuthLoginInterfaceReturn } from './interfaces/auth-login-return';
 import * as bcrypt from 'bcrypt';
+import { AuthVerifyPassport } from './dto/auth-verify-password.dto';
+import { Request, Response } from 'express';
+import { jwtConstants } from './constants';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
@@ -19,7 +23,11 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
   ) {}
+
+  private PRIVATE_KEY_CLIENT =
+    this.configService.get<string>('SECRET_KEY_CLIENT');
 
   // private
   private async authDtoLoginUser(user: User) {
@@ -37,14 +45,17 @@ export class AuthService {
 
   // public
 
-  async login(data: AuthLoginDto): Promise<AuthLoginInterfaceReturn> {
+  async login(
+    data: AuthLoginDto,
+    response: Response,
+  ): Promise<AuthLoginInterfaceReturn> {
     const { email, password } = data;
 
     // get user
     const user = await this.usersService.findByEmail(email);
 
     // verify user
-    if (!user) {
+    if (!user?.id || user?.email !== email) {
       throw new BadRequestException('usuário não encontrado');
     }
 
@@ -59,18 +70,80 @@ export class AuthService {
 
     const { id } = user;
     const dataJwt = { id, email };
+
     const access_token = await this.jwtService.signAsync(dataJwt, {
-      expiresIn: '1m',
+      expiresIn: jwtConstants.tokenExpiration,
     });
 
     const refresh_token = await this.jwtService.signAsync(dataJwt, {
-      expiresIn: '1h',
+      expiresIn: jwtConstants.refreshTokenExpiration,
+    });
+
+    const dataUser: Partial<User> = {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+    };
+    // this information is diferent.
+    const session = await this.jwtService.signAsync(dataUser, {
+      secret: this.PRIVATE_KEY_CLIENT,
+    });
+
+    // set cookies
+
+    response.cookie('access_token', access_token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      path: '/',
+    });
+
+    response.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      path: '/',
+    });
+
+    response.cookie('session', session, {
+      path: '/',
     });
 
     return {
       access_token,
       refresh_token,
     };
+  }
+
+  // refresh token
+
+  async refreshToken(req: Request, res: Response) {
+    const refresh = req.cookies.refresh_token || null;
+
+    // if refresh is null
+    if (!refresh) {
+      throw new BadRequestException('não foi possivel fazer o refresh');
+    }
+
+    try {
+      // verify refresh token
+      const { id, email }: User = await this.jwtService.verifyAsync(refresh);
+      // create new token
+      const token = await this.jwtService.signAsync(
+        { id, email },
+        {
+          expiresIn: jwtConstants.tokenExpiration,
+        },
+      );
+
+      res.cookie('access_token', token);
+
+      return {
+        error: false,
+        message: 'passport atualizado com sucesso!',
+      };
+    } catch (error) {
+      console.log(error);
+      throw new BadRequestException('houve um erro ao tentar decode');
+    }
   }
 
   // send email to user
@@ -141,6 +214,12 @@ export class AuthService {
       error: false,
       message: 'usuário verificado!',
     };
+  }
+
+  // auth jwt
+
+  async verifyJwt({ access_token }: AuthVerifyPassport): Promise<boolean> {
+    return !!(await this.jwtService.verifyAsync(access_token));
   }
 
   // privates methods
