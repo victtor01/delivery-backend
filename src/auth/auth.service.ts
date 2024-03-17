@@ -26,8 +26,7 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  private PRIVATE_KEY_CLIENT =
-    this.configService.get<string>('SECRET_KEY_CLIENT');
+  private SECRET_KEY = this.configService.get<string>('SECRET_KEY_CLIENT');
 
   // private
   private async authDtoLoginUser(user: User) {
@@ -73,10 +72,12 @@ export class AuthService {
 
     const access_token = await this.jwtService.signAsync(dataJwt, {
       expiresIn: jwtConstants.tokenExpiration,
+      secret: this.SECRET_KEY,
     });
 
     const refresh_token = await this.jwtService.signAsync(dataJwt, {
       expiresIn: jwtConstants.refreshTokenExpiration,
+      secret: this.SECRET_KEY,
     });
 
     const dataUser: Partial<User> = {
@@ -84,10 +85,6 @@ export class AuthService {
       lastName: user.lastName,
       email: user.email,
     };
-    // this information is diferent.
-    const session = await this.jwtService.signAsync(dataUser, {
-      secret: this.PRIVATE_KEY_CLIENT,
-    });
 
     // set cookies
 
@@ -103,13 +100,10 @@ export class AuthService {
       path: '/',
     });
 
-    response.cookie('session', session, {
-      path: '/',
-    });
-
     return {
       access_token,
       refresh_token,
+      user: dataUser,
     };
   }
 
